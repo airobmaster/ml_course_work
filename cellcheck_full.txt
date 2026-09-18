@@ -1,0 +1,916 @@
+CELL 84 markdown
+### 3.1 Train/Validation Split
+
+A stratified 80/20 split is used so that the validation set preserves approximately the same damage-grade proportions as the complete training data.
+
+This validation set will be used consistently to compare the baseline models.
+----
+CELL 85 code
+from sklearn.model_selection import train_test_split
+
+
+X_train, X_valid, y_train, y_valid = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    stratify=y,
+    random_state=RANDOM_STATE
+)
+
+print("Training set  :", X_train.shape)
+print("Validation set:", X_valid.shape)
+
+print("\nTraining target distribution:")
+print(y_train.value_counts(normalize=True).sort_index())
+
+print("\nValidation target distribution:")
+print(y_valid.value_counts(normalize=True).sort_index())
+----
+CELL 86 markdown
+## 4. Model
+
+Baseline models are trained and compared, the best candidate is tuned, and the final model is used to generate predictions for submission.
+----
+CELL 87 markdown
+### 4.1 Model Evaluation
+
+All classification models will be evaluated on exactly the same validation set.
+
+The following metrics are recorded:
+
+- Micro-F1 — primary evaluation metric
+- Accuracy
+- Macro-F1 — useful for understanding performance across classes
+- Weighted-F1 — accounts for class frequency
+
+For this single-label multiclass problem, Micro-F1 and Accuracy are mathematically equivalent.
+----
+CELL 88 code
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+)
+
+
+validation_results = []
+
+
+def evaluate_model(model_name, y_true, y_pred):
+    """Evaluate a multiclass classifier and store validation metrics."""
+
+    metrics = {
+        "Model": model_name,
+        "Micro-F1": f1_score(y_true, y_pred, average="micro"),
+        "Accuracy": accuracy_score(y_true, y_pred),
+        "Macro-F1": f1_score(y_true, y_pred, average="macro"),
+        "Weighted-F1": f1_score(y_true, y_pred, average="weighted"),
+    }
+
+    validation_results.append(metrics)
+
+    print(f"\n{model_name}")
+    print("-" * len(model_name))
+    print(f"Micro-F1    : {metrics['Micro-F1']:.4f}")
+    print(f"Accuracy    : {metrics['Accuracy']:.4f}")
+    print(f"Macro-F1    : {metrics['Macro-F1']:.4f}")
+    print(f"Weighted-F1 : {metrics['Weighted-F1']:.4f}")
+
+    print("\nClassification report:")
+    print(
+        classification_report(
+            y_true,
+            y_pred,
+            digits=4
+        )
+    )
+
+    return metrics
+----
+CELL 89 markdown
+### 4.2 Logistic Regression Baseline
+
+Logistic Regression provides a simple linear baseline.
+
+Categorical and geographic features are one-hot encoded, continuous variables are standardized, and binary indicators are passed through unchanged.
+
+`class_weight="balanced"` is used because the damage grades are imbalanced.
+----
+CELL 90 code
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+
+logistic_preprocessor = ColumnTransformer(
+    transformers=[
+        ("numeric", StandardScaler(), NUMERIC_COLS),
+        (
+            "categorical",
+            OneHotEncoder(handle_unknown="ignore"),
+            CATEGORICAL_COLS,
+        ),
+        (
+            "geo",
+            OneHotEncoder(handle_unknown="ignore"),
+            GEO_COLS,
+        ),
+        ("binary", "passthrough", BINARY_COLS),
+    ],
+    remainder="drop",
+)
+
+
+logistic_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", logistic_preprocessor),
+        (
+            "classifier",
+            LogisticRegression(
+                max_iter=1000,
+                class_weight="balanced",
+                random_state=RANDOM_STATE,
+            ),
+        ),
+    ]
+)
+
+
+logistic_pipeline.fit(X_train, y_train)
+
+logistic_pred = logistic_pipeline.predict(X_valid)
+
+evaluate_model(
+    "Logistic Regression",
+    y_valid,
+    logistic_pred
+)
+----
+CELL 91 markdown
+### 4.3 Random Forest Baseline
+
+Random Forest provides a nonlinear tree-based benchmark.
+
+The categorical variables are one-hot encoded. Geographic IDs are retained as numeric identifiers for this baseline so that the model remains computationally practical given the high cardinality of `geo_level_3_id`.
+----
+CELL 92 code
+from sklearn.ensemble import RandomForestClassifier
+
+
+rf_preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "categorical",
+            OneHotEncoder(handle_unknown="ignore"),
+            CATEGORICAL_COLS,
+        ),
+        ("geo", "passthrough", GEO_COLS),
+        ("numeric", "passthrough", NUMERIC_COLS),
+        ("binary", "passthrough", BINARY_COLS),
+    ],
+    remainder="drop",
+)
+
+
+rf_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", rf_preprocessor),
+        (
+            "classifier",
+            RandomForestClassifier(
+                n_estimators=200,
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+                class_weight="balanced",
+            ),
+        ),
+    ]
+)
+
+
+rf_pipeline.fit(X_train, y_train)
+
+rf_pred = rf_pipeline.predict(X_valid)
+
+evaluate_model(
+    "Random Forest",
+    y_valid,
+    rf_pred
+)
+----
+CELL 93 markdown
+### 4.4 XGBoost Baseline
+
+XGBoost is evaluated as a second gradient-boosted tree benchmark.
+
+To keep the comparison focused, this notebook uses a single predefined multiclass configuration rather than performing a separate hyperparameter search.
+
+Categorical variables are encoded numerically using `OrdinalEncoder`. The resulting feature matrix is suitable for XGBoost's tree-based learner.
+----
+CELL 94 code
+from sklearn.preprocessing import OrdinalEncoder
+
+
+xgb_preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "categorical",
+            OrdinalEncoder(
+                handle_unknown="use_encoded_value",
+                unknown_value=-1,
+            ),
+            [*GEO_COLS, *CATEGORICAL_COLS],
+        ),
+        ("numeric", "passthrough", NUMERIC_COLS),
+        ("binary", "passthrough", BINARY_COLS),
+    ],
+    remainder="drop",
+)
+----
+CELL 95 code
+from sklearn.preprocessing import OrdinalEncoder
+from xgboost import XGBClassifier
+
+
+# XGBoost requires class labels to start at 0.
+# Original damage grades are 1, 2, 3.
+xgb_label_map = {
+    1: 0,
+    2: 1,
+    3: 2,
+}
+
+xgb_inverse_label_map = {
+    0: 1,
+    1: 2,
+    2: 3,
+}
+
+y_train_xgb = y_train.map(xgb_label_map)
+y_valid_xgb = y_valid.map(xgb_label_map)
+
+
+xgb_preprocessor = ColumnTransformer(
+    transformers=[
+        (
+            "categorical",
+            OrdinalEncoder(
+                handle_unknown="use_encoded_value",
+                unknown_value=-1,
+            ),
+            [*GEO_COLS, *CATEGORICAL_COLS],
+        ),
+        ("numeric", "passthrough", NUMERIC_COLS),
+        ("binary", "passthrough", BINARY_COLS),
+    ],
+    remainder="drop",
+)
+
+
+xgb_pipeline = Pipeline(
+    steps=[
+        ("preprocessor", xgb_preprocessor),
+        (
+            "classifier",
+            XGBClassifier(
+                objective="multi:softmax",
+                num_class=3,
+                n_estimators=500,
+                learning_rate=0.05,
+                max_depth=6,
+                min_child_weight=5,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+                eval_metric="mlogloss",
+                tree_method="hist",
+            ),
+        ),
+    ]
+)
+
+
+xgb_pipeline.fit(
+    X_train,
+    y_train_xgb,
+)
+
+
+# XGBoost returns 0, 1, 2.
+# Convert back to the original damage grades 1, 2, 3.
+xgb_pred_encoded = xgb_pipeline.predict(X_valid)
+
+xgb_pred = pd.Series(
+    xgb_pred_encoded,
+    index=y_valid.index,
+).map(xgb_inverse_label_map)
+
+
+evaluate_model(
+    "XGBoost",
+    y_valid,
+    xgb_pred,
+)
+----
+CELL 96 markdown
+### 4.5 LightGBM Baseline
+
+LightGBM is particularly suitable for this dataset because it can directly handle categorical variables and efficiently model nonlinear interactions.
+
+The three geographic identifiers are treated as categorical variables because they are hierarchical region IDs rather than continuous measurements.
+----
+CELL 97 code
+import lightgbm as lgb
+
+
+LGB_CATEGORICAL_COLS = [
+    *GEO_COLS,
+    *CATEGORICAL_COLS,
+]
+
+
+def prepare_lgb_data(train_df, valid_df=None, categorical_cols=None):
+    """Convert categorical columns to aligned pandas categorical dtype."""
+
+    categorical_cols = categorical_cols or []
+
+    train_out = train_df.copy()
+    valid_out = None if valid_df is None else valid_df.copy()
+
+    for col in categorical_cols:
+        train_out[col] = train_out[col].astype("category")
+
+        if valid_out is not None:
+            valid_out[col] = valid_out[col].astype("category")
+            valid_out[col] = valid_out[col].cat.set_categories(
+                train_out[col].cat.categories
+            )
+
+    return train_out, valid_out
+----
+CELL 98 code
+X_train_lgb, X_valid_lgb = prepare_lgb_data(
+    X_train,
+    X_valid,
+    LGB_CATEGORICAL_COLS
+)
+
+
+lgb_baseline = lgb.LGBMClassifier(
+    objective="multiclass",
+    num_class=3,
+    n_estimators=500,
+    learning_rate=0.05,
+    num_leaves=31,
+    max_depth=-1,
+    subsample=0.8,
+    subsample_freq=1,
+    colsample_bytree=0.8,
+    random_state=RANDOM_STATE,
+    n_jobs=-1,
+    force_col_wise=True,
+    verbosity=-1,
+)
+
+
+lgb_baseline.fit(
+    X_train_lgb,
+    y_train,
+    categorical_feature=LGB_CATEGORICAL_COLS,
+)
+
+
+lgb_baseline_pred = lgb_baseline.predict(X_valid_lgb).astype(int)
+
+evaluate_model(
+    "LightGBM Baseline",
+    y_valid,
+    lgb_baseline_pred
+)
+----
+CELL 99 markdown
+### 4.6 Validation Model Comparison
+
+The following table compares all models using the same validation set.
+
+The primary metric is **Micro-F1**. The remaining metrics provide additional information about performance across the three damage grades.
+----
+CELL 100 code
+validation_results_df = (
+    pd.DataFrame(validation_results)
+    .sort_values("Micro-F1", ascending=False)
+    .reset_index(drop=True)
+)
+
+validation_results_df
+
+validation_results_df = (
+    pd.DataFrame(validation_results)
+    .sort_values("Micro-F1", ascending=False)
+    .reset_index(drop=True)
+)
+
+validation_results_df
+----
+CELL 101 markdown
+### 4.7 LightGBM Hyperparameter Tuning
+
+Rather than performing a very large hyperparameter search, this uses `RandomizedSearchCV` over a deliberately narrow range based on the behaviour observed during model development.
+
+The search focuses on:
+
+- `num_leaves`
+- `min_child_samples`
+- `colsample_bytree`
+- `subsample`
+
+The learning rate and number of estimators are kept fixed to control the search space.
+
+The search itself uses stratified 3-fold cross-validation and Micro-F1 as the optimization metric.
+----
+CELL 102 code
+from sklearn.metrics import make_scorer
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
+
+
+micro_f1_scorer = make_scorer(
+    f1_score,
+    average="micro"
+)
+
+
+lgb_search_model = lgb.LGBMClassifier(
+    objective="multiclass",
+    num_class=3,
+    n_estimators=900,
+    learning_rate=0.03,
+    max_depth=-1,
+    subsample_freq=1,
+    random_state=RANDOM_STATE,
+    n_jobs=-1,
+    force_col_wise=True,
+    verbosity=-1,
+)
+
+
+param_distributions = {
+    "num_leaves": [12, 15, 20, 25, 31],
+    "min_child_samples": [150, 200, 250, 300],
+    "colsample_bytree": [0.7, 0.8, 0.9, 1.0],
+    "subsample": [0.8, 0.9, 1.0],
+}
+
+
+search_cv = StratifiedKFold(
+    n_splits=3,
+    shuffle=True,
+    random_state=RANDOM_STATE,
+)
+
+
+random_search = RandomizedSearchCV(
+    estimator=lgb_search_model,
+    param_distributions=param_distributions,
+    n_iter=10,
+    scoring=micro_f1_scorer,
+    cv=search_cv,
+    random_state=RANDOM_STATE,
+    n_jobs=1,
+    verbose=1,
+    refit=True,
+)
+
+
+random_search.fit(
+    X_train_lgb,
+    y_train,
+    categorical_feature=LGB_CATEGORICAL_COLS,
+)
+----
+CELL 103 code
+print("Best parameters:")
+print(random_search.best_params_)
+
+print(f"\nBest CV Micro-F1: {random_search.best_score_:.4f}")
+----
+CELL 104 markdown
+### 4.8 Tuned LightGBM Validation Performance
+
+The best configuration found by `RandomizedSearchCV` is now evaluated on the held-out validation set.
+
+This validation score is separate from the cross-validation score used during hyperparameter search.
+----
+CELL 105 code
+tuned_lgbm = random_search.best_estimator_
+
+tuned_lgb_pred = tuned_lgbm.predict(
+    X_valid_lgb
+).astype(int)
+
+
+evaluate_model(
+    "LightGBM - RandomizedSearchCV",
+    y_valid,
+    tuned_lgb_pred
+)
+----
+CELL 106 code
+#regenerate the comparison table
+
+tuned_lgbm = random_search.best_estimator_
+
+tuned_lgb_pred = tuned_lgbm.predict(
+    X_valid_lgb
+).astype(int)
+
+
+evaluate_model(
+    "LightGBM - RandomizedSearchCV",
+    y_valid,
+    tuned_lgb_pred
+)
+----
+CELL 107 markdown
+### 4.9 Stratified 5-Fold Cross-Validation
+
+After selecting the LightGBM configuration, its stability is evaluated using 5-fold stratified cross-validation.
+
+Each fold preserves the class distribution of the target.
+
+The following are reported:
+
+- Mean Micro-F1
+- Standard deviation
+- Minimum fold score
+- Maximum fold score
+----
+CELL 108 code
+from sklearn.model_selection import StratifiedKFold
+
+
+cv = StratifiedKFold(
+    n_splits=5,
+    shuffle=True,
+    random_state=RANDOM_STATE,
+)
+
+
+cv_scores = []
+
+
+for fold, (train_idx, valid_idx) in enumerate(
+    cv.split(X, y),
+    start=1
+):
+    X_fold_train = X.iloc[train_idx].copy()
+    X_fold_valid = X.iloc[valid_idx].copy()
+
+    y_fold_train = y.iloc[train_idx]
+    y_fold_valid = y.iloc[valid_idx]
+
+    X_fold_train_lgb, X_fold_valid_lgb = prepare_lgb_data(
+        X_fold_train,
+        X_fold_valid,
+        LGB_CATEGORICAL_COLS
+    )
+
+    fold_model = lgb.LGBMClassifier(
+        objective="multiclass",
+        num_class=3,
+        n_estimators=900,
+        learning_rate=0.03,
+        num_leaves=random_search.best_params_["num_leaves"],
+        min_child_samples=random_search.best_params_[
+            "min_child_samples"
+        ],
+        colsample_bytree=random_search.best_params_[
+            "colsample_bytree"
+        ],
+        subsample=random_search.best_params_["subsample"],
+        subsample_freq=1,
+        max_depth=-1,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+        force_col_wise=True,
+        verbosity=-1,
+    )
+
+    fold_model.fit(
+        X_fold_train_lgb,
+        y_fold_train,
+        categorical_feature=LGB_CATEGORICAL_COLS,
+    )
+
+    fold_pred = fold_model.predict(
+        X_fold_valid_lgb
+    ).astype(int)
+
+    fold_score = f1_score(
+        y_fold_valid,
+        fold_pred,
+        average="micro"
+    )
+
+    cv_scores.append(fold_score)
+
+    print(f"Fold {fold}: {fold_score:.4f}")
+----
+CELL 109 code
+# Summary:
+
+cv_summary = pd.DataFrame({
+    "Model": ["Tuned LightGBM"],
+    "CV Folds": [len(cv_scores)],
+    "Mean Micro-F1": [sum(cv_scores) / len(cv_scores)],
+    "Std": [pd.Series(cv_scores).std()],
+    "Min": [min(cv_scores)],
+    "Max": [max(cv_scores)],
+})
+
+cv_summary.style.format({
+    "Mean Micro-F1": "{:.4f}",
+    "Std": "{:.4f}",
+    "Min": "{:.4f}",
+    "Max": "{:.4f}",
+})
+----
+CELL 110 markdown
+### Model Results Summary
+
+All models below were scored on the **same held-out validation set** (52,121 buildings; classes 1/2/3 with support 5,025 / 29,652 / 17,444).
+
+| Model | Micro-F1 / Accuracy | Macro-F1 | Weighted-F1 |
+|---|---|---|---|
+| Logistic Regression (baseline) | 0.6966 | 0.6713 | 0.7025 |
+| Random Forest (baseline) | 0.6996 | 0.6676 | 0.7015 |
+| XGBoost (baseline) | 0.7267 | 0.6626 | 0.7182 |
+| LightGBM (baseline) | 0.7527 | 0.7074 | 0.7492 |
+| **LightGBM (RandomizedSearchCV tuned)** | **0.7532** | **0.7078** | **0.7497** |
+
+**Hyperparameter search (`RandomizedSearchCV`, 3-fold stratified CV):** best CV Micro-F1 = 0.7452, with `num_leaves=25`, `min_child_samples=150`, `colsample_bytree=0.7`, `subsample=0.8`.
+
+**5-fold stratified CV of the tuned LightGBM:** Mean Micro-F1 = 0.7499, Std = 0.0017, Min = 0.7480, Max = 0.7515.
+
+**Inference**
+
+- **LightGBM is the clear and final choice.** It leads on every aggregate metric among the baselines, and its native handling of the high-cardinality `geo_level_3_id` (and other categoricals) as categories — rather than one-hot expansion — is a practical advantage the other models don't share.
+- **Tuning added very little (+0.05 pp Micro-F1 over the untuned baseline: 0.7527 → 0.7532).** The narrow, experience-guided search range was already close to optimal, so most of LightGBM's advantage comes from the algorithm/feature-handling choice, not hyperparameter search.
+- **The 5-fold CV (mean 0.7499, std 0.0017) confirms the ~0.75 Micro-F1 is stable, not a lucky split** — the tight spread (0.7480–0.7515) shows the model generalizes consistently across resamples of the data.
+- **Tree-based models beat the linear baseline on accuracy, but not uniformly on Macro-F1.** Logistic Regression's `class_weight="balanced"` trades precision for recall on the minority class (Grade 1: recall 0.85 vs. precision 0.44), which keeps its Macro-F1 (0.6713) competitive despite much lower overall accuracy — while XGBoost's higher accuracy (0.7267) comes with a lower Macro-F1 (0.6626) because it favors the majority classes and under-recalls Grade 1 (recall 0.45).
+- **Grade 2 (the majority class) is predicted reliably by every model** (LightGBM F1 = 0.797), while **Grade 1 (the minority class) remains the hardest to separate** across all models — the main lever for further improvement is feature engineering (e.g., geographic aggregates, structural interactions) rather than additional hyperparameter tuning.
+
+----
+CELL 111 code
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+summary_data = pd.DataFrame({
+    "Model": [
+        "LogisticRegression",
+        "RandomForest",
+        "XGBoost",
+        "LightGBM(baseline)",
+        "LightGBM(tuned)",
+    ],
+    "Micro-F1 / Accuracy": [0.6966, 0.6996, 0.7267, 0.7527, 0.7532],
+    "Macro-F1": [0.6713, 0.6676, 0.6626, 0.7074, 0.7078],
+    "Weighted-F1": [0.7025, 0.7015, 0.7182, 0.7492, 0.7497],
+})
+
+metric_colors = {
+    "Micro-F1 / Accuracy": "#2a78d6",
+    "Macro-F1": "#eb6834",
+    "Weighted-F1": "#1baf7a",
+}
+
+cv_scores_summary = [0.7488, 0.7498, 0.7515, 0.7513, 0.7480]
+
+fig, axes = plt.subplots(1, 2, figsize=(16, 6), gridspec_kw={"width_ratios": [3, 2]})
+
+# --- Left panel: grouped bar chart of validation metrics per model ---
+ax = axes[0]
+metrics = list(metric_colors.keys())
+n_metrics = len(metrics)
+bar_width = 0.25
+x = np.arange(len(summary_data))
+
+for i, metric in enumerate(metrics):
+    offset = (i - (n_metrics - 1) / 2) * bar_width
+    bars = ax.bar(
+        x + offset,
+        summary_data[metric],
+        width=bar_width,
+        label=metric,
+        color=metric_colors[metric],
+    )
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            height + 0.006,
+            f"{height:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+ax.set_xticks(x)
+ax.set_xticklabels(summary_data["Model"])
+ax.set_ylim(0.6, 0.82)
+ax.set_ylabel("Score")
+ax.set_title("Validation Metrics by Model", fontsize=13, fontweight="bold")
+ax.legend(loc="upper left", frameon=False)
+ax.grid(axis="y", alpha=0.25)
+for spine in ["top", "right"]:
+    ax.spines[spine].set_visible(False)
+
+# --- Right panel: 5-fold CV stability of the tuned LightGBM ---
+ax2 = axes[1]
+folds = np.arange(1, len(cv_scores_summary) + 1)
+mean_score = np.mean(cv_scores_summary)
+
+ax2.axhspan(min(cv_scores_summary), max(cv_scores_summary), color="#2a78d6", alpha=0.08)
+ax2.axhline(mean_score, color="#898781", linestyle="--", linewidth=1.5, label=f"Mean = {mean_score:.4f}")
+ax2.plot(folds, cv_scores_summary, marker="o", markersize=8, color="#2a78d6", linewidth=2)
+
+for f, score in zip(folds, cv_scores_summary):
+    ax2.text(f, score + 0.0006, f"{score:.4f}", ha="center", va="bottom", fontsize=9)
+
+ax2.set_xticks(folds)
+ax2.set_xlabel("Fold")
+ax2.set_ylabel("Micro-F1")
+ax2.set_title("Tuned LightGBM — 5-Fold CV Stability", fontsize=13, fontweight="bold")
+ax2.set_ylim(0.745, 0.754)
+ax2.legend(loc="lower right", frameon=False)
+ax2.grid(axis="y", alpha=0.25)
+for spine in ["top", "right"]:
+    ax2.spines[spine].set_visible(False)
+
+plt.tight_layout()
+plt.show()
+
+----
+CELL 112 markdown
+### 4.10 SHAP — Explaining the Tuned LightGBM
+
+SHAP (SHapley Additive exPlanations) is used to understand which features contribute most strongly to the LightGBM predictions.
+
+This analysis focuses on **Grade 3** because it represents near-total destruction.
+
+Important:
+
+- SHAP magnitude measures the contribution to the model output, not a percentage probability.
+- Positive SHAP values for Grade 3 push the prediction toward Grade 3.
+- Negative values push it away from Grade 3.
+- SHAP describes model behaviour and should not be interpreted as causal evidence.
+----
+CELL 113 code
+import shap
+
+
+SHAP_SAMPLE_SIZE = min(5000, len(X_valid_lgb))
+
+X_shap_sample = X_valid_lgb.sample(
+    n=SHAP_SAMPLE_SIZE,
+    random_state=RANDOM_STATE
+)
+
+explainer = shap.TreeExplainer(tuned_lgbm)
+
+shap_values = explainer.shap_values(
+    X_shap_sample
+)
+
+print("SHAP type:", type(shap_values))
+----
+CELL 114 code
+# Because SHAP's output format can vary by version, handle both cases:
+
+if isinstance(shap_values, list):
+    shap_values_grade3 = shap_values[2]
+    expected_grade3 = explainer.expected_value[2]
+else:
+    shap_values_grade3 = shap_values[:, :, 2]
+    expected_grade3 = explainer.expected_value[2]
+
+print(
+    "Grade 3 SHAP shape:",
+    shap_values_grade3.shape
+)
+----
+CELL 115 code
+## Global importance:
+
+shap_importance = (
+    pd.DataFrame({
+        "Feature": X_shap_sample.columns,
+        "Mean |SHAP|": np.abs(
+            shap_values_grade3
+        ).mean(axis=0),
+    })
+    .sort_values(
+        "Mean |SHAP|",
+        ascending=False
+    )
+    .reset_index(drop=True)
+)
+
+shap_importance.head(20)
+----
+CELL 116 code
+# Beeswarm:
+
+shap_grade3_explanation = shap.Explanation(
+    values=shap_values_grade3,
+    base_values=expected_grade3,
+    data=X_shap_sample,
+    feature_names=X_shap_sample.columns,
+)
+
+shap.plots.beeswarm(
+    shap_grade3_explanation,
+    max_display=20,
+    show=True
+)
+----
+CELL 117 markdown
+### 4.11 Final Model
+
+LightGBM is used as the final model because the validation and cross-validation results establish it as the strongest candidate in the pipeline.
+
+The selected hyperparameters come from the targeted `RandomizedSearchCV`.
+
+The final model is retrained using **all available training observations** before generating predictions for the test dataset.
+----
+CELL 118 code
+X_final_lgb, X_test_final_lgb = prepare_lgb_data(
+    X,
+    X_test,
+    LGB_CATEGORICAL_COLS
+)
+
+
+final_lgbm = lgb.LGBMClassifier(
+    objective="multiclass",
+    num_class=3,
+    n_estimators=900,
+    learning_rate=0.03,
+    num_leaves=random_search.best_params_["num_leaves"],
+    min_child_samples=random_search.best_params_[
+        "min_child_samples"
+    ],
+    colsample_bytree=random_search.best_params_[
+        "colsample_bytree"
+    ],
+    subsample=random_search.best_params_["subsample"],
+    subsample_freq=1,
+    max_depth=-1,
+    random_state=RANDOM_STATE,
+    n_jobs=-1,
+    force_col_wise=True,
+    verbosity=-1,
+)
+
+
+final_lgbm.fit(
+    X_final_lgb,
+    y,
+    categorical_feature=LGB_CATEGORICAL_COLS,
+)
+----
+CELL 119 markdown
+### 4.12 Test Predictions
+
+The final LightGBM model is used to predict the damage grade for every building in the test dataset.
+----
+CELL 120 code
+test_predictions = (
+    final_lgbm
+    .predict(X_test_final_lgb)
+    .astype(int)
+)
+
+print("Number of test predictions:", len(test_predictions))
+print("\nPrediction distribution:")
+print(
+    pd.Series(test_predictions)
+    .value_counts(normalize=True)
+    .sort_index()
+    .mul(100)
+    .round(3)
+)
+----
+CELL 121 markdown
+### 4.13 Submission File
+
+The submission contains:
+
+- `building_id`
+- `damage_grade`
+
+The original test-set building ID order is preserved.
+----

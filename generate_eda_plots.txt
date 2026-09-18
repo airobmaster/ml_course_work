@@ -1,0 +1,379 @@
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import numpy as np
+from pathlib import Path
+
+# ---- palette (from dataviz skill reference/palette.md, light mode) ----
+INK_PRIMARY = "#0b0b0b"
+INK_SECONDARY = "#52514e"
+INK_MUTED = "#898781"
+GRID = "#e1e0d9"
+BASELINE = "#c3c2b7"
+SURFACE = "#fcfcfb"
+
+CAT = {
+    "blue": "#2a78d6",
+    "orange": "#eb6834",
+    "aqua": "#1baf7a",
+    "yellow": "#eda100",
+    "magenta": "#e87ba4",
+    "green": "#008300",
+    "violet": "#4a3aa7",
+    "red": "#e34948",
+}
+SEQ_BLUE = {100: "#cde2fb", 150: "#b7d3f6", 200: "#9ec5f4", 250: "#86b6ef",
+            300: "#6da7ec", 350: "#5598e7", 400: "#3987e5", 450: "#2a78d6",
+            500: "#256abf", 550: "#1c5cab", 600: "#184f95", 650: "#104281", 700: "#0d366b"}
+DIVERGE_BLUE = "#2a78d6"
+DIVERGE_RED = "#e34948"
+
+plt.rcParams.update({
+    "figure.facecolor": SURFACE,
+    "axes.facecolor": SURFACE,
+    "savefig.facecolor": SURFACE,
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Segoe UI", "Arial", "DejaVu Sans"],
+    "text.color": INK_PRIMARY,
+    "axes.edgecolor": BASELINE,
+    "axes.labelcolor": INK_SECONDARY,
+    "xtick.color": INK_MUTED,
+    "ytick.color": INK_MUTED,
+    "axes.grid": True,
+    "grid.color": GRID,
+    "grid.linewidth": 0.8,
+    "axes.axisbelow": True,
+    "font.size": 11,
+})
+
+OUT = Path("assets/figures")
+OUT.mkdir(parents=True, exist_ok=True)
+
+DATA = Path("datasets")
+train_values = pd.read_csv(DATA / "train_values.csv")
+train_labels = pd.read_csv(DATA / "train_labels.csv")
+test_values = pd.read_csv(DATA / "test_values.csv")
+
+ID_COL = "building_id"
+TARGET_COL = "damage_grade"
+GEO_COLS = ["geo_level_1_id", "geo_level_2_id", "geo_level_3_id"]
+CATEGORICAL_COLS = [
+    "land_surface_condition", "foundation_type", "roof_type",
+    "ground_floor_type", "other_floor_type", "position",
+    "plan_configuration", "legal_ownership_status",
+]
+SUPERSTRUCTURE_COLS = [
+    "has_superstructure_adobe_mud", "has_superstructure_mud_mortar_stone",
+    "has_superstructure_stone_flag", "has_superstructure_cement_mortar_stone",
+    "has_superstructure_mud_mortar_brick", "has_superstructure_cement_mortar_brick",
+    "has_superstructure_timber", "has_superstructure_bamboo",
+    "has_superstructure_rc_non_engineered", "has_superstructure_rc_engineered",
+    "has_superstructure_other",
+]
+SECONDARY_USE_SUB_COLS = [
+    "has_secondary_use_agriculture", "has_secondary_use_hotel",
+    "has_secondary_use_rental", "has_secondary_use_institution",
+    "has_secondary_use_school", "has_secondary_use_industry",
+    "has_secondary_use_health_post", "has_secondary_use_gov_office",
+    "has_secondary_use_use_police", "has_secondary_use_other",
+]
+NUMERIC_COLS = GEO_COLS + [
+    "count_floors_pre_eq", "age", "area_percentage", "height_percentage", "count_families",
+]
+
+df = train_values.merge(train_labels, on=ID_COL)
+
+
+def style_ax(ax, hide_spines=("top", "right", "left")):
+    for s in hide_spines:
+        ax.spines[s].set_visible(False)
+    ax.spines["bottom"].set_color(BASELINE)
+
+
+def bar_labels(ax, bars, fmt="{:,.0f}", color=INK_SECONDARY, pad=3, horizontal=False):
+    for b in bars:
+        if horizontal:
+            w = b.get_width()
+            ax.text(w + pad, b.get_y() + b.get_height() / 2, fmt.format(w),
+                     va="center", ha="left", fontsize=9.5, color=color)
+        else:
+            h = b.get_height()
+            ax.text(b.get_x() + b.get_width() / 2, h + pad, fmt.format(h),
+                     va="bottom", ha="center", fontsize=9.5, color=color)
+
+
+# ---------------------------------------------------------------
+# Section 4: Target distribution (ordinal severity -> sequential blue ramp)
+# ---------------------------------------------------------------
+counts = train_labels[TARGET_COL].value_counts().sort_index()
+pct = train_labels[TARGET_COL].value_counts(normalize=True).sort_index() * 100
+colors = [SEQ_BLUE[250], SEQ_BLUE[450], SEQ_BLUE[650]]
+
+fig, ax = plt.subplots(figsize=(6.5, 4.2))
+bars = ax.bar([f"Grade {g}" for g in counts.index], counts.values, color=colors, width=0.6)
+for b, p in zip(bars, pct.values):
+    ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 2500,
+            f"{b.get_height():,.0f}\n({p:.1f}%)", ha="center", va="bottom",
+            fontsize=10, color=INK_SECONDARY)
+ax.set_ylabel("Number of buildings")
+ax.set_title("Target Distribution: damage_grade (train)", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+ax.set_ylim(0, counts.max() * 1.22)
+ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
+style_ax(ax)
+ax.grid(axis="x", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "target_distribution.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 5: Geo cardinality (distinct entities -> categorical colors), log scale
+# ---------------------------------------------------------------
+all_geo = pd.concat([train_values[GEO_COLS], test_values[GEO_COLS]], axis=0, ignore_index=True)
+uniq = [all_geo[c].nunique() for c in GEO_COLS]
+labels = ["geo_level_1_id\n(region)", "geo_level_2_id\n(district)", "geo_level_3_id\n(municipality)"]
+colors3 = [CAT["blue"], CAT["orange"], CAT["aqua"]]
+
+fig, ax = plt.subplots(figsize=(7, 4.5))
+bars = ax.bar(labels, uniq, color=colors3, width=0.55)
+ax.set_yscale("log")
+for b, v in zip(bars, uniq):
+    ax.text(b.get_x() + b.get_width() / 2, b.get_height() * 1.12, f"{v:,}",
+            ha="center", va="bottom", fontsize=10.5, color=INK_SECONDARY)
+ax.set_ylabel("Unique values (log scale, train + test)")
+ax.set_title("Geographic Hierarchy Cardinality", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+style_ax(ax)
+ax.grid(axis="x", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "geo_cardinality.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 6: age distribution with 995 placeholder spike
+# ---------------------------------------------------------------
+fig, ax = plt.subplots(figsize=(8, 4.5))
+age = train_values["age"]
+bins = list(range(0, 210, 5)) + [995]
+ax.hist(age[age < 200], bins=range(0, 205, 5), color=CAT["blue"], edgecolor=SURFACE, linewidth=0.5)
+ax.set_xlim(0, 210)
+ax2 = ax.inset_axes([0.60, 0.32, 0.37, 0.58])
+n995 = int((age == 995).sum())
+vals995 = [int((age < 200).sum()), n995]
+bars995 = ax2.bar([0, 1], vals995, color=[CAT["blue"], CAT["red"]], width=0.55)
+ax2.set_yscale("log")
+ax2.set_ylim(100, 1_000_000)
+ax2.set_xticks([0, 1])
+ax2.set_xticklabels(["age < 200", "age == 995"], fontsize=8)
+for i, v in enumerate(vals995):
+    ax2.text(i, v * 1.3, f"{v:,}", ha="center", va="bottom", fontsize=8.5, color=INK_SECONDARY)
+ax2.set_title("age == 995 check (log scale)", fontsize=9, color=INK_SECONDARY)
+ax2.tick_params(labelsize=8)
+style_ax(ax2)
+ax2.grid(axis="x", visible=False)
+ax.set_xlabel("age (years, values < 200 shown)")
+ax.set_ylabel("Number of buildings")
+ax.set_title("Building Age Distribution — 995 is a Placeholder Code, Not a Real Age",
+             color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+style_ax(ax)
+ax.grid(axis="x", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "age_distribution.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 6: boxplots for other continuous numeric features
+# ---------------------------------------------------------------
+cols = ["count_floors_pre_eq", "area_percentage", "height_percentage", "count_families"]
+fig, axes = plt.subplots(1, 4, figsize=(11, 4.5))
+for ax, col in zip(axes, cols):
+    bp = ax.boxplot(train_values[col], vert=True, widths=0.5, patch_artist=True,
+                     boxprops=dict(facecolor=CAT["blue"], color=BASELINE),
+                     medianprops=dict(color=INK_PRIMARY, linewidth=1.5),
+                     whiskerprops=dict(color=INK_MUTED),
+                     capprops=dict(color=INK_MUTED),
+                     flierprops=dict(marker="o", markersize=3, markerfacecolor=CAT["red"],
+                                      markeredgecolor="none", alpha=0.4))
+    ax.set_title(col, fontsize=10, color=INK_SECONDARY)
+    ax.set_xticks([])
+    style_ax(ax, hide_spines=("top", "right"))
+    ax.grid(axis="x", visible=False)
+fig.suptitle("Distribution & Outliers — Continuous Numeric Features", color=INK_PRIMARY, fontsize=12, x=0.12, ha="left")
+plt.tight_layout(rect=[0, 0, 1, 0.94])
+plt.savefig(OUT / "numeric_boxplots.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 7: categorical value counts grid
+# ---------------------------------------------------------------
+fig, axes = plt.subplots(2, 4, figsize=(15, 7))
+for ax, col in zip(axes.flat, CATEGORICAL_COLS):
+    vc = train_values[col].value_counts()
+    bars = ax.barh(vc.index[::-1], vc.values[::-1], color=CAT["blue"], height=0.6)
+    ax.set_title(f"{col}", fontsize=10.5, color=INK_SECONDARY)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
+    for b in bars:
+        ax.text(b.get_width() * 1.01, b.get_y() + b.get_height() / 2, f"{b.get_width():,.0f}",
+                va="center", ha="left", fontsize=8, color=INK_SECONDARY)
+    style_ax(ax, hide_spines=("top", "right"))
+    ax.grid(axis="y", visible=False)
+    ax.set_xlim(0, vc.values.max() * 1.22)
+fig.suptitle("Categorical Feature Value Counts (train)", color=INK_PRIMARY, fontsize=13, x=0.08, ha="left")
+plt.tight_layout(rect=[0, 0, 1, 0.95])
+plt.savefig(OUT / "categorical_counts.png", dpi=150)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 8: superstructure prevalence (single magnitude -> sequential blue)
+# ---------------------------------------------------------------
+prev = train_values[SUPERSTRUCTURE_COLS].mean().sort_values(ascending=True) * 100
+short_labels = [c.replace("has_superstructure_", "") for c in prev.index]
+fig, ax = plt.subplots(figsize=(8, 5.5))
+bars = ax.barh(short_labels, prev.values, color=CAT["blue"], height=0.6)
+bar_labels(ax, bars, fmt="{:.1f}%", horizontal=True)
+ax.set_xlabel("% of buildings with this superstructure material")
+ax.set_title("Superstructure Material Prevalence", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+ax.set_xlim(0, prev.max() * 1.2)
+style_ax(ax, hide_spines=("top", "right"))
+ax.grid(axis="y", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "superstructure_prevalence.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 8: secondary use prevalence
+# ---------------------------------------------------------------
+prev2 = train_values[SECONDARY_USE_SUB_COLS].mean().sort_values(ascending=True) * 100
+short_labels2 = [c.replace("has_secondary_use_", "") for c in prev2.index]
+fig, ax = plt.subplots(figsize=(8, 5.5))
+bars = ax.barh(short_labels2, prev2.values, color=CAT["orange"], height=0.6)
+bar_labels(ax, bars, fmt="{:.2f}%", horizontal=True)
+ax.set_xlabel("% of buildings with this secondary use")
+ax.set_title("Secondary-Use Flag Prevalence", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+ax.set_xlim(0, prev2.max() * 1.25)
+style_ax(ax, hide_spines=("top", "right"))
+ax.grid(axis="y", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "secondary_use_prevalence.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 8: number of superstructure flags per building
+# ---------------------------------------------------------------
+n_flags = train_values[SUPERSTRUCTURE_COLS].sum(axis=1).value_counts().sort_index()
+fig, ax = plt.subplots(figsize=(7, 4.5))
+bars = ax.bar(n_flags.index.astype(str), n_flags.values, color=CAT["blue"], width=0.6)
+ax.set_yscale("log")
+for b, v in zip(bars, n_flags.values):
+    ax.text(b.get_x() + b.get_width() / 2, b.get_height() * 1.15, f"{v:,}",
+            ha="center", va="bottom", fontsize=8.5, color=INK_SECONDARY)
+ax.set_xlabel("Number of superstructure materials flagged")
+ax.set_ylabel("Number of buildings (log scale)")
+ax.set_title("Superstructure Flags Set per Building", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+style_ax(ax)
+ax.grid(axis="x", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "flags_per_building.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 9: damage_grade by foundation_type (100% stacked, ordinal severity -> seq blue ramp)
+# ---------------------------------------------------------------
+ct = pd.crosstab(df["foundation_type"], df[TARGET_COL], normalize="index").sort_index()
+order = ct.sum(axis=1).index  # keep natural order h,i,r,u,w
+fig, ax = plt.subplots(figsize=(8, 4.8))
+left = np.zeros(len(ct))
+grade_colors = {1: SEQ_BLUE[250], 2: SEQ_BLUE[450], 3: SEQ_BLUE[650]}
+for grade in [1, 2, 3]:
+    vals = ct[grade].values * 100
+    bars = ax.barh(ct.index, vals, left=left, color=grade_colors[grade], height=0.6,
+                    label=f"Grade {grade}", edgecolor=SURFACE, linewidth=1)
+    for y, (l, v) in enumerate(zip(left, vals)):
+        if v > 5:
+            ax.text(l + v / 2, y, f"{v:.0f}%", ha="center", va="center", fontsize=9,
+                    color="white" if grade in (2, 3) else INK_PRIMARY)
+    left += vals
+ax.set_xlim(0, 100)
+ax.set_xlabel("Share of buildings (%)")
+ax.set_title("damage_grade Distribution by foundation_type", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), ncol=3, frameon=False, fontsize=9.5)
+style_ax(ax, hide_spines=("top", "right", "left"))
+ax.grid(axis="y", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "damage_by_foundation.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 9: damage_grade heatmap by geo_level_1_id (sequential blue)
+# ---------------------------------------------------------------
+ct_geo = pd.crosstab(df["geo_level_1_id"], df[TARGET_COL], normalize="index").sort_index()
+fig, ax = plt.subplots(figsize=(6.5, 8.5))
+im = ax.imshow(ct_geo.values, aspect="auto", cmap="Blues", vmin=0, vmax=ct_geo.values.max())
+ax.set_yticks(range(len(ct_geo.index)))
+ax.set_yticklabels(ct_geo.index, fontsize=8)
+ax.set_xticks(range(3))
+ax.set_xticklabels(["Grade 1", "Grade 2", "Grade 3"], fontsize=9.5)
+ax.set_ylabel("geo_level_1_id")
+ax.set_title("damage_grade Row % by geo_level_1_id\n(darker = higher share)", color=INK_PRIMARY, fontsize=11.5, loc="left", pad=10)
+for i in range(ct_geo.shape[0]):
+    for j in range(ct_geo.shape[1]):
+        v = ct_geo.values[i, j]
+        ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=6.7,
+                color="white" if v > 0.5 else INK_PRIMARY)
+for s in ax.spines.values():
+    s.set_visible(False)
+plt.tight_layout()
+plt.savefig(OUT / "damage_by_geo1.png", dpi=160)
+plt.close()
+
+# ---------------------------------------------------------------
+# Section 9: correlation with target (diverging blue<->red, polarity)
+# ---------------------------------------------------------------
+corr = df[NUMERIC_COLS + [TARGET_COL]].corr()[TARGET_COL].drop(TARGET_COL).sort_values()
+colors_corr = [DIVERGE_RED if v < 0 else DIVERGE_BLUE for v in corr.values]
+fig, ax = plt.subplots(figsize=(8.5, 4.8))
+bars = ax.barh(corr.index, corr.values, color=colors_corr, height=0.6)
+pad = 0.012
+for b, v in zip(bars, corr.values):
+    ax.text(v + (pad if v >= 0 else -pad), b.get_y() + b.get_height() / 2, f"{v:+.3f}",
+            va="center", ha="left" if v >= 0 else "right", fontsize=9, color=INK_SECONDARY)
+ax.axvline(0, color=BASELINE, linewidth=1)
+ax.set_xlim(corr.min() - 0.05, corr.max() + 0.05)
+ax.set_xlabel("Pearson correlation with damage_grade")
+ax.set_title("Numeric Feature Correlation with damage_grade", color=INK_PRIMARY, fontsize=12, loc="left", pad=12)
+style_ax(ax, hide_spines=("top", "right", "left"))
+ax.grid(axis="y", visible=False)
+plt.tight_layout()
+plt.savefig(OUT / "correlation_with_target.png", dpi=160)
+plt.close()
+
+print("All figures written to", OUT.resolve())
+for p in sorted(OUT.glob("*.png")):
+    print(" -", p.name, p.stat().st_size, "bytes")
+
+
+# =================================================================
+# Notebook plot extraction (run separately, not part of the chart-
+# generation pass above) -- pulls the two already-rendered plots
+# (correlation heatmap and sampled pairplot) out of the notebook's
+# saved outputs so they can be reused in the Markdown report instead
+# of being re-rendered from scratch.
+# =================================================================
+#
+# import json, base64
+# nb = json.load(open('assets/use_case_eda.ipynb', encoding='utf-8'))
+#
+# def save_img(cell_idx, out_path):
+#     c = nb['cells'][cell_idx]
+#     for o in c.get('outputs', []):
+#         data = o.get('data', {})
+#         if 'image/png' in data:
+#             b64 = data['image/png']
+#             if isinstance(b64, list):
+#                 b64 = ''.join(b64)
+#             with open(out_path, 'wb') as f:
+#                 f.write(base64.b64decode(b64))
+#             return
+#
+# save_img(34, 'assets/figures/nb_sampled_pairplot.png')   # sampled pairplot colored by damage_grade
+# save_img(36, 'assets/figures/nb_correlation_heatmap.png')  # full numeric correlation heatmap

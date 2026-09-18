@@ -1,0 +1,811 @@
+{
+  "source": "Computed from datasets/train_values.csv and datasets/train_labels.csv (260,601 rows)",
+  "id_col": "building_id",
+  "target": {
+    "name": "damage_grade",
+    "display_name": "Damage Grade",
+    "classes": [
+      1,
+      2,
+      3
+    ],
+    "class_labels": {
+      "1": "Grade 1 - Low damage",
+      "2": "Grade 2 - Medium damage",
+      "3": "Grade 3 - Severe damage / destroyed"
+    },
+    "class_distribution": {
+      "1": {
+        "count": 25124,
+        "pct": 9.64079186188848
+      },
+      "2": {
+        "count": 148259,
+        "pct": 56.89118614280068
+      },
+      "3": {
+        "count": 87218,
+        "pct": 33.46802199531084
+      }
+    }
+  },
+  "feature_order": [
+    "geo_level_1_id",
+    "geo_level_2_id",
+    "geo_level_3_id",
+    "count_floors_pre_eq",
+    "age",
+    "area_percentage",
+    "height_percentage",
+    "count_families",
+    "land_surface_condition",
+    "foundation_type",
+    "roof_type",
+    "ground_floor_type",
+    "other_floor_type",
+    "position",
+    "plan_configuration",
+    "legal_ownership_status",
+    "has_superstructure_adobe_mud",
+    "has_superstructure_mud_mortar_stone",
+    "has_superstructure_stone_flag",
+    "has_superstructure_cement_mortar_stone",
+    "has_superstructure_mud_mortar_brick",
+    "has_superstructure_cement_mortar_brick",
+    "has_superstructure_timber",
+    "has_superstructure_bamboo",
+    "has_superstructure_rc_non_engineered",
+    "has_superstructure_rc_engineered",
+    "has_superstructure_other",
+    "has_secondary_use",
+    "has_secondary_use_agriculture",
+    "has_secondary_use_hotel",
+    "has_secondary_use_rental",
+    "has_secondary_use_institution",
+    "has_secondary_use_school",
+    "has_secondary_use_industry",
+    "has_secondary_use_health_post",
+    "has_secondary_use_gov_office",
+    "has_secondary_use_use_police",
+    "has_secondary_use_other"
+  ],
+  "geo_cols": [
+    "geo_level_1_id",
+    "geo_level_2_id",
+    "geo_level_3_id"
+  ],
+  "numeric_cols": [
+    "count_floors_pre_eq",
+    "age",
+    "area_percentage",
+    "height_percentage",
+    "count_families"
+  ],
+  "categorical_cols": [
+    "land_surface_condition",
+    "foundation_type",
+    "roof_type",
+    "ground_floor_type",
+    "other_floor_type",
+    "position",
+    "plan_configuration",
+    "legal_ownership_status"
+  ],
+  "superstructure_cols": [
+    "has_superstructure_adobe_mud",
+    "has_superstructure_mud_mortar_stone",
+    "has_superstructure_stone_flag",
+    "has_superstructure_cement_mortar_stone",
+    "has_superstructure_mud_mortar_brick",
+    "has_superstructure_cement_mortar_brick",
+    "has_superstructure_timber",
+    "has_superstructure_bamboo",
+    "has_superstructure_rc_non_engineered",
+    "has_superstructure_rc_engineered",
+    "has_superstructure_other"
+  ],
+  "secondary_use_umbrella_col": "has_secondary_use",
+  "secondary_use_sub_cols": [
+    "has_secondary_use_agriculture",
+    "has_secondary_use_hotel",
+    "has_secondary_use_rental",
+    "has_secondary_use_institution",
+    "has_secondary_use_school",
+    "has_secondary_use_industry",
+    "has_secondary_use_health_post",
+    "has_secondary_use_gov_office",
+    "has_secondary_use_use_police",
+    "has_secondary_use_other"
+  ],
+  "features": {
+    "geo_level_1_id": {
+      "name": "geo_level_1_id",
+      "display_name": "Geo Level 1",
+      "dtype": "int",
+      "feature_type": "geo",
+      "description": "Geographic region identifier, level 1 (largest area).",
+      "min": 0,
+      "max": 30,
+      "n_unique_in_train": 31
+    },
+    "geo_level_2_id": {
+      "name": "geo_level_2_id",
+      "display_name": "Geo Level 2",
+      "dtype": "int",
+      "feature_type": "geo",
+      "description": "Geographic region identifier, level 2 (nested within level 1).",
+      "min": 0,
+      "max": 1427,
+      "n_unique_in_train": 1414
+    },
+    "geo_level_3_id": {
+      "name": "geo_level_3_id",
+      "display_name": "Geo Level 3",
+      "dtype": "int",
+      "feature_type": "geo",
+      "description": "Geographic region identifier, level 3 (most granular, nested within level 2).",
+      "min": 0,
+      "max": 12567,
+      "n_unique_in_train": 11595
+    },
+    "count_floors_pre_eq": {
+      "name": "count_floors_pre_eq",
+      "display_name": "Floor Count (pre-earthquake)",
+      "dtype": "int",
+      "feature_type": "numeric",
+      "description": "Number of floors the building had before the earthquake.",
+      "min": 1,
+      "max": 9,
+      "mean": 2.1297232167182782,
+      "median": 2.0,
+      "p1": 1.0,
+      "p99": 4.0
+    },
+    "age": {
+      "name": "age",
+      "display_name": "Building Age",
+      "dtype": "int",
+      "feature_type": "numeric",
+      "description": "Age of the building, in years.",
+      "min": 0,
+      "max": 995,
+      "mean": 26.535028645323695,
+      "median": 15.0,
+      "p1": 0.0,
+      "p99": 100.0
+    },
+    "area_percentage": {
+      "name": "area_percentage",
+      "display_name": "Area Percentage",
+      "dtype": "int",
+      "feature_type": "numeric",
+      "description": "Normalised footprint area of the building.",
+      "min": 1,
+      "max": 100,
+      "mean": 8.018050583075276,
+      "median": 7.0,
+      "p1": 2.0,
+      "p99": 23.0
+    },
+    "height_percentage": {
+      "name": "height_percentage",
+      "display_name": "Height Percentage",
+      "dtype": "int",
+      "feature_type": "numeric",
+      "description": "Normalised height of the building.",
+      "min": 2,
+      "max": 32,
+      "mean": 5.43436517895173,
+      "median": 5.0,
+      "p1": 2.0,
+      "p99": 11.0
+    },
+    "count_families": {
+      "name": "count_families",
+      "display_name": "Number of Families",
+      "dtype": "int",
+      "feature_type": "numeric",
+      "description": "Number of families living in the building.",
+      "min": 0,
+      "max": 9,
+      "mean": 0.9839486417933929,
+      "median": 1.0,
+      "p1": 0.0,
+      "p99": 2.0
+    },
+    "land_surface_condition": {
+      "name": "land_surface_condition",
+      "display_name": "Land Surface Condition",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Surface condition of the land the building sits on.",
+      "values": [
+        {
+          "code": "n",
+          "label": "Flat",
+          "count": 35528,
+          "pct": 13.633101945119167
+        },
+        {
+          "code": "o",
+          "label": "Moderate slope / obstructed",
+          "count": 8316,
+          "pct": 3.191085222236292
+        },
+        {
+          "code": "t",
+          "label": "Steep slope / terraced",
+          "count": 216757,
+          "pct": 83.17581283264454
+        }
+      ],
+      "default": "t"
+    },
+    "foundation_type": {
+      "name": "foundation_type",
+      "display_name": "Foundation Type",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Type of foundation used.",
+      "values": [
+        {
+          "code": "h",
+          "label": "Mud mortar - stone/brick",
+          "count": 1448,
+          "pct": 0.5556386967049244
+        },
+        {
+          "code": "i",
+          "label": "Bamboo/timber",
+          "count": 10579,
+          "pct": 4.059462550028588
+        },
+        {
+          "code": "r",
+          "label": "Cement/RC",
+          "count": 219196,
+          "pct": 84.11172635561644
+        },
+        {
+          "code": "u",
+          "label": "Unknown",
+          "count": 14260,
+          "pct": 5.471966723074739
+        },
+        {
+          "code": "w",
+          "label": "Other",
+          "count": 15118,
+          "pct": 5.801205674575309
+        }
+      ],
+      "default": "r"
+    },
+    "roof_type": {
+      "name": "roof_type",
+      "display_name": "Roof Type",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Type of roof used.",
+      "values": [
+        {
+          "code": "n",
+          "label": "Bamboo/timber - light roof",
+          "count": 182842,
+          "pct": 70.16166476721118
+        },
+        {
+          "code": "q",
+          "label": "Bamboo/timber - heavy roof",
+          "count": 61576,
+          "pct": 23.62845883170057
+        },
+        {
+          "code": "x",
+          "label": "RCC/RB/RBC",
+          "count": 16183,
+          "pct": 6.209876401088254
+        }
+      ],
+      "default": "n"
+    },
+    "ground_floor_type": {
+      "name": "ground_floor_type",
+      "display_name": "Ground Floor Type",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Construction material of the ground floor.",
+      "values": [
+        {
+          "code": "f",
+          "label": "Mud",
+          "count": 209619,
+          "pct": 80.43675964405355
+        },
+        {
+          "code": "m",
+          "label": "Timber",
+          "count": 508,
+          "pct": 0.19493401790476628
+        },
+        {
+          "code": "v",
+          "label": "RCC",
+          "count": 24593,
+          "pct": 9.437032091204562
+        },
+        {
+          "code": "x",
+          "label": "Brick/stone",
+          "count": 24877,
+          "pct": 9.546010951608014
+        },
+        {
+          "code": "z",
+          "label": "Other",
+          "count": 1004,
+          "pct": 0.385263295229105
+        }
+      ],
+      "default": "f"
+    },
+    "other_floor_type": {
+      "name": "other_floor_type",
+      "display_name": "Other Floor Type",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Construction material of the floor(s) above ground level.",
+      "values": [
+        {
+          "code": "j",
+          "label": "Timber/bamboo - mud",
+          "count": 39843,
+          "pct": 15.288889912164574
+        },
+        {
+          "code": "q",
+          "label": "Timber plank",
+          "count": 165282,
+          "pct": 63.423394384518865
+        },
+        {
+          "code": "s",
+          "label": "RCC/RB/RBC",
+          "count": 12028,
+          "pct": 4.615484975115215
+        },
+        {
+          "code": "x",
+          "label": "Not applicable",
+          "count": 43448,
+          "pct": 16.67223072820135
+        }
+      ],
+      "default": "q"
+    },
+    "position": {
+      "name": "position",
+      "display_name": "Building Position",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Position of the building relative to adjacent structures.",
+      "values": [
+        {
+          "code": "j",
+          "label": "Attached on one side",
+          "count": 13282,
+          "pct": 5.096680365769894
+        },
+        {
+          "code": "o",
+          "label": "Not attached / stand-alone",
+          "count": 2333,
+          "pct": 0.8952383145114562
+        },
+        {
+          "code": "s",
+          "label": "Attached on two sides",
+          "count": 202090,
+          "pct": 77.54766865821696
+        },
+        {
+          "code": "t",
+          "label": "Attached on three sides / corner",
+          "count": 42896,
+          "pct": 16.46041266150168
+        }
+      ],
+      "default": "s"
+    },
+    "plan_configuration": {
+      "name": "plan_configuration",
+      "display_name": "Plan Configuration",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Shape of the building's floor plan.",
+      "values": [
+        {
+          "code": "a",
+          "label": "Square",
+          "count": 252,
+          "pct": 0.09669955218897855
+        },
+        {
+          "code": "c",
+          "label": "Rectangular",
+          "count": 325,
+          "pct": 0.12471172405324615
+        },
+        {
+          "code": "d",
+          "label": "T-shaped / cross-shaped",
+          "count": 250072,
+          "pct": 95.95972386905653
+        },
+        {
+          "code": "f",
+          "label": "L-shaped",
+          "count": 22,
+          "pct": 0.00844202439745051
+        },
+        {
+          "code": "m",
+          "label": "Multi-projected",
+          "count": 46,
+          "pct": 0.017651505558305608
+        },
+        {
+          "code": "n",
+          "label": "T-shaped",
+          "count": 38,
+          "pct": 0.014581678504687242
+        },
+        {
+          "code": "o",
+          "label": "Other",
+          "count": 159,
+          "pct": 0.06101281269066504
+        },
+        {
+          "code": "q",
+          "label": "U-shaped",
+          "count": 5692,
+          "pct": 2.184181948649468
+        },
+        {
+          "code": "s",
+          "label": "Irregular",
+          "count": 346,
+          "pct": 0.13277002006899435
+        },
+        {
+          "code": "u",
+          "label": "Unknown",
+          "count": 3649,
+          "pct": 1.4002248648316775
+        }
+      ],
+      "default": "d"
+    },
+    "legal_ownership_status": {
+      "name": "legal_ownership_status",
+      "display_name": "Legal Ownership Status",
+      "dtype": "category",
+      "feature_type": "categorical",
+      "description": "Legal ownership status of the land.",
+      "values": [
+        {
+          "code": "a",
+          "label": "Private",
+          "count": 5512,
+          "pct": 2.1151108399430547
+        },
+        {
+          "code": "r",
+          "label": "Rented",
+          "count": 1473,
+          "pct": 0.5652319062474818
+        },
+        {
+          "code": "v",
+          "label": "Other",
+          "count": 250939,
+          "pct": 96.29241637599242
+        },
+        {
+          "code": "w",
+          "label": "Government",
+          "count": 2677,
+          "pct": 1.0272408778170459
+        }
+      ],
+      "default": "v"
+    },
+    "has_superstructure_adobe_mud": {
+      "name": "has_superstructure_adobe_mud",
+      "display_name": "Has Superstructure Adobe Mud",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Adobe/mud.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 8.864509345704736,
+      "default": 0
+    },
+    "has_superstructure_mud_mortar_stone": {
+      "name": "has_superstructure_mud_mortar_stone",
+      "display_name": "Has Superstructure Mud Mortar Stone",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Mud mortar - stone.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 76.19349119918957,
+      "default": 1
+    },
+    "has_superstructure_stone_flag": {
+      "name": "has_superstructure_stone_flag",
+      "display_name": "Has Superstructure Stone Flag",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Stone flag.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 3.4332178310904413,
+      "default": 0
+    },
+    "has_superstructure_cement_mortar_stone": {
+      "name": "has_superstructure_cement_mortar_stone",
+      "display_name": "Has Superstructure Cement Mortar Stone",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Cement mortar - stone.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 1.82347726984931,
+      "default": 0
+    },
+    "has_superstructure_mud_mortar_brick": {
+      "name": "has_superstructure_mud_mortar_brick",
+      "display_name": "Has Superstructure Mud Mortar Brick",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Mud mortar - brick.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 6.815399787414476,
+      "default": 0
+    },
+    "has_superstructure_cement_mortar_brick": {
+      "name": "has_superstructure_cement_mortar_brick",
+      "display_name": "Has Superstructure Cement Mortar Brick",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Cement mortar - brick.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 7.526832207090534,
+      "default": 0
+    },
+    "has_superstructure_timber": {
+      "name": "has_superstructure_timber",
+      "display_name": "Has Superstructure Timber",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Timber.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 25.498750964117562,
+      "default": 0
+    },
+    "has_superstructure_bamboo": {
+      "name": "has_superstructure_bamboo",
+      "display_name": "Has Superstructure Bamboo",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes Bamboo.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 8.501118568232663,
+      "default": 0
+    },
+    "has_superstructure_rc_non_engineered": {
+      "name": "has_superstructure_rc_non_engineered",
+      "display_name": "Has Superstructure Rc Non Engineered",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes RC, non-engineered.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 4.259001308513781,
+      "default": 0
+    },
+    "has_superstructure_rc_engineered": {
+      "name": "has_superstructure_rc_engineered",
+      "display_name": "Has Superstructure Rc Engineered",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes RC, engineered.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 1.5859494015755888,
+      "default": 0
+    },
+    "has_superstructure_other": {
+      "name": "has_superstructure_other",
+      "display_name": "Has Superstructure Other",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the superstructure includes other material.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 1.4984593305474654,
+      "default": 0
+    },
+    "has_secondary_use": {
+      "name": "has_secondary_use",
+      "display_name": "Has Secondary Use",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building has any secondary use beyond a dwelling.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 11.187984696912137,
+      "default": 0
+    },
+    "has_secondary_use_agriculture": {
+      "name": "has_secondary_use_agriculture",
+      "display_name": "Has Secondary Use Agriculture",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for agriculture.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 6.437811059819418,
+      "default": 0
+    },
+    "has_secondary_use_hotel": {
+      "name": "has_secondary_use_hotel",
+      "display_name": "Has Secondary Use Hotel",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for a hotel.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 3.3626118088572188,
+      "default": 0
+    },
+    "has_secondary_use_rental": {
+      "name": "has_secondary_use_rental",
+      "display_name": "Has Secondary Use Rental",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for rental.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.8100506137735466,
+      "default": 0
+    },
+    "has_secondary_use_institution": {
+      "name": "has_secondary_use_institution",
+      "display_name": "Has Secondary Use Institution",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for an institution.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.09401345351706249,
+      "default": 0
+    },
+    "has_secondary_use_school": {
+      "name": "has_secondary_use_school",
+      "display_name": "Has Secondary Use School",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for a school.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.03607046788001581,
+      "default": 0
+    },
+    "has_secondary_use_industry": {
+      "name": "has_secondary_use_industry",
+      "display_name": "Has Secondary Use Industry",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for industry.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.10706021849494053,
+      "default": 0
+    },
+    "has_secondary_use_health_post": {
+      "name": "has_secondary_use_health_post",
+      "display_name": "Has Secondary Use Health Post",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for a health post.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.018802690703412495,
+      "default": 0
+    },
+    "has_secondary_use_gov_office": {
+      "name": "has_secondary_use_gov_office",
+      "display_name": "Has Secondary Use Gov Office",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for a government office.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.014581678504687242,
+      "default": 0
+    },
+    "has_secondary_use_use_police": {
+      "name": "has_secondary_use_use_police",
+      "display_name": "Has Secondary Use Use Police",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for a police station.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.008825752779152804,
+      "default": 0
+    },
+    "has_secondary_use_other": {
+      "name": "has_secondary_use_other",
+      "display_name": "Has Secondary Use Other",
+      "dtype": "binary",
+      "feature_type": "binary",
+      "description": "Whether the building is also used for another secondary purpose.",
+      "values": [
+        0,
+        1
+      ],
+      "prevalence_pct": 0.5118936611908627,
+      "default": 0
+    }
+  }
+}
