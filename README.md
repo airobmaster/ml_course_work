@@ -1,5 +1,9 @@
 # Nepal Earthquake — Building Damage Prediction
 
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue.svg)
+![Streamlit](https://img.shields.io/badge/built%20with-Streamlit-FF4B4B.svg)
+
 A course-work data science project that predicts the damage grade of buildings affected by the
 2015 Gorkha earthquake in Nepal, based on the Kathmandu Living Labs / Central Bureau of
 Statistics survey (the "Richter's Predictor" dataset). The project covers the full workflow —
@@ -52,7 +56,7 @@ The project is organized into two parts:
 
 ```
 ├── assets/                  Notebooks, problem/metric definitions, generated figures
-├── datasets/                Raw competition data (train/test values, train labels)
+├── datasets/                Raw competition data (not included — see "Getting the Dataset" below)
 ├── outputs/                 Processed datasets and generated submissions
 ├── scripts/                 Standalone scripts (model training, feature metadata generation)
 ├── dashboard/                Streamlit application (see dashboard/README.md for details)
@@ -77,9 +81,26 @@ The Streamlit app provides:
 - **Analysis Notebook** — a viewer for the full exploratory/modeling notebook
 - **About** — background on the dataset, problem, and modeling approach
 
+## Getting the Dataset
+
+This repository does **not** include the raw dataset — it must be downloaded directly from
+DrivenData, which requires a free account:
+
+1. Create an account and log in at [drivendata.org](https://www.drivendata.org/).
+2. Join the [Richter's Predictor: Modeling Earthquake Damage](https://www.drivendata.org/competitions/57/nepal-earthquake/) competition.
+3. From the competition's **Data Download** page, download:
+   - `train_values.csv`
+   - `train_labels.csv`
+   - `test_values.csv`
+4. Place all three files in the `datasets/` folder at the repository root.
+
+Downloading the data yourself, rather than obtaining a copy from a third party, ensures you
+agree to DrivenData's own terms of use for the dataset (see [License](#license) below).
+
 ## How to Run the App
 
-**Prerequisites:** Python 3.11 and the dependencies in [`requirements.txt`](requirements.txt).
+**Prerequisites:** Python 3.11, the dependencies in [`requirements.txt`](requirements.txt), and
+the dataset placed in `datasets/` as described above.
 
 ```bash
 # 1. Create and activate a virtual environment, then install dependencies
@@ -94,6 +115,29 @@ python scripts/train_model.py                 # datasets/*.csv -> dashboard/mode
 streamlit run dashboard/app.py
 ```
 
-The app will open in your browser (default: `http://localhost:8501`). Steps 2 only need to be
+The app will open in your browser (default: `http://localhost:8501`). Step 2 only needs to be
 re-run if the underlying datasets change; see [`dashboard/README.md`](dashboard/README.md) for
 further details on the dashboard's internals.
+
+## Contributing
+
+Suggestions and improvements are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to
+propose changes, report issues, and the local setup for testing them.
+
+## Acknowledgments
+
+- Dataset: [Richter's Predictor: Modeling Earthquake Damage](https://www.drivendata.org/competitions/57/nepal-earthquake/)
+  (DrivenData), collected by [Kathmandu Living Labs](https://kathmandulivinglabs.org/) and the
+  Central Bureau of Statistics under Nepal's National Planning Commission.
+
+## License
+
+This project's code, notebooks, and documentation are licensed under the
+[MIT License](LICENSE) — see the file for the full text.
+
+**The dataset is licensed separately and is not covered by the MIT License above.** It is
+distributed by DrivenData under its own terms of use, and access requires creating a free
+DrivenData account and agreeing to those terms — see
+[Getting the Dataset](#getting-the-dataset). For that reason, no dataset files are committed to
+this repository (`datasets/` is git-ignored); download the data yourself from DrivenData rather
+than obtaining a copy from elsewhere.
